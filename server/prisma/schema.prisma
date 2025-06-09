@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String
+  files     File[]   @relation("UserFiles")
+  given     Access[] @relation("AccessFrom")
+  received  Access[] @relation("AccessTo")
+}
+
+model File {
+  id          String   @id @default(uuid())
+  name        String
+  url         String
+  ownerId     String
+  owner       User     @relation("UserFiles", fields: [ownerId], references: [id])
+  accesses    Access[] // people who were granted access
+  createdAt   DateTime @default(now())
+}
+
+model Access {
+  id        String   @id @default(uuid())
+  fromId    String
+  toId      String
+  fileId    String
+
+  from      User     @relation("AccessFrom", fields: [fromId], references: [id])
+  to        User     @relation("AccessTo", fields: [toId], references: [id])
+  file      File     @relation(fields: [fileId], references: [id])
+
+  grantedAt DateTime @default(now())
+
+  @@unique([fromId, toId, fileId]) // prevent duplicate grants
+}

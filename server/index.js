@@ -7,20 +7,29 @@ const session = require("express-session");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const jwt = require("jsonwebtoken");
 const fileRoutes = require("./routes/files");
+const { PrismaClient } = require("@prisma/client");
+
+const prisma = new PrismaClient();
 
 const app = express();
 const PORT = 3000;
 
-app.use(cors());
-app.use(express.json());
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    methods: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
 
-app.use("/files", fileRoutes);
+app.use(express.json());
 
 app.use(
   session({
-    secret: "secret",
+    secret: "secret-session-key",
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
   })
 );
 
@@ -34,18 +43,34 @@ passport.use(
       clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       callbackURL: "http://localhost:3000/auth/google/callback",
     },
-    (accessToken, refreshToken, profile, done) => {
-      return done(null, profile);
+    async (accessToken, refreshToken, profile, done) => {
+      const email = profile.emails[0].value;
+      const name = profile.displayName;
+
+      let user = await prisma.user.findUnique({ where: { email } });
+
+      if (!user) {
+        user = await prisma.user.create({
+          data: { email, name },
+        });
+      }
+
+      return done(null, user);
     }
   )
 );
 
 passport.serializeUser((user, done) => {
-  done(null, user);
+  done(null, user.id);
 });
 
-passport.deserializeUser((user, done) => {
-  done(null, user);
+passport.deserializeUser(async (id, done) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id } });
+    done(null, user);
+  } catch (err) {
+    done(err, null);
+  }
 });
 
 const verifyJWT = (req, res, next) => {
@@ -56,8 +81,11 @@ const verifyJWT = (req, res, next) => {
     ? authHeader.slice(7)
     : authHeader;
 
-  jwt.verify(token, "jwt_secret_key", (err, decoded) => {
-    if (err) return res.status(401).send("Invalid Token");
+  jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      console.error("JWT verification error:", err.message); // <--- Add this line
+      return res.status(401).send("Invalid Token");
+    }
     req.user = decoded;
     next();
   });
@@ -82,16 +110,17 @@ app.get(
   (req, res) => {
     const user = req.user;
     const payload = {
-      email: user.emails[0].value,
-      name: user.displayName,
+      email: user.email,
+      name: user.name,
     };
 
-    const token = jwt.sign(payload, "jwt_secret_key", { expiresIn: "1h" });
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
 
-    console.log("Generated JWT:", token);
-
-    // res.redirect(`http://localhost:5173/dashboard?token=${token}`);
-    res.json({ token });
+    res.redirect(
+      `http://localhost:5173/auth?token=${encodeURIComponent(token)}`
+    );
   }
 );
 
@@ -99,17 +128,17 @@ app.get("/dashboard", verifyJWT, (req, res) => {
   res.send(`Welcome ${req.user.name}`);
 });
 
-app.get("/logout", (req, res) => {
+app.get("/logout", (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
     res.redirect("/");
   });
 });
 
-// app.get("/", (req, res) => {
-//   res.send("ConsentChain backend is running!");
-// });
+app.use("/files", fileRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
+
+module.exports = { verifyJWT };
