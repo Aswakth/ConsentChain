@@ -3,138 +3,174 @@ const router = express.Router();
 const { PrismaClient } = require("@prisma/client");
 const prisma = new PrismaClient();
 const verifyJWT = require("../utils/auth");
+const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 // Apply JWT verification middleware to all routes in this router
 router.use(verifyJWT);
 
-// Upload a file for the authenticated user
-router.post("/upload", async (req, res) => {
-  const { filename } = req.body;
-  const email = req.user.email;
+const upload = multer({ dest: "uploads/" });
 
-  console.log("Upload request:", { filename, email });
+// Upload a file for authenticated user
+router.post("/upload", upload.single("file"), async (req, res) => {
+  const email = req.user.email;
+  const file = req.file;
+
+  if (!file) return res.status(400).json({ error: "No file uploaded" });
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { email },
-    });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    if (!user) {
-      console.log("Upload failed: user not found for email", email);
-      return res.status(404).json({ error: "User not found" });
-    }
+    const result = await cloudinary.uploader.upload(file.path, {
+      folder: "consentchain_files",
+      resource_type: "auto",
+    });
 
     const createdFile = await prisma.file.create({
       data: {
-        name: filename,
-        url: `https://your-storage.com/${filename}`, // Placeholder URL
+        name: file.originalname,
+        url: result.secure_url,
         ownerId: user.id,
+        publicId: result.public_id,
       },
     });
 
-    console.log("File created:", createdFile);
-    res.json({ message: "File uploaded!" });
+    res.json({ message: "File uploaded!", file: createdFile });
   } catch (error) {
     console.error("Upload error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// Grant access to a specific file for a user (by email)
+// Grant access to a file to another user
 router.post("/grant", async (req, res) => {
   const { toEmail, fileId } = req.body;
   const fromEmail = req.user.email;
 
-  if (!fileId) {
-    return res.status(400).json({ error: "fileId is required" });
-  }
+  if (!fileId || !toEmail)
+    return res.status(400).json({ error: "Missing toEmail or fileId" });
 
   try {
     const fromUser = await prisma.user.findUnique({
       where: { email: fromEmail },
     });
-    const toUser = await prisma.user.findUnique({
-      where: { email: toEmail },
-    });
+    const toUser = await prisma.user.findUnique({ where: { email: toEmail } });
 
-    if (!fromUser || !toUser) {
+    if (!fromUser || !toUser)
       return res.status(404).json({ error: "User not found" });
-    }
 
-    // Verify the file belongs to the user granting access
-    const file = await prisma.file.findUnique({
-      where: { id: fileId },
-    });
+    const file = await prisma.file.findUnique({ where: { id: fileId } });
+    if (!file) return res.status(404).json({ error: "File not found" });
 
-    if (!file) {
-      return res.status(404).json({ error: "File not found" });
-    }
-
-    if (file.ownerId !== fromUser.id) {
+    if (file.ownerId !== fromUser.id)
       return res.status(403).json({ error: "You do not own this file" });
-    }
 
-    // Check if access already granted to this user for this file
     const existingAccess = await prisma.access.findFirst({
       where: {
         fromId: fromUser.id,
         toId: toUser.id,
-        fileId: fileId,
+        fileId,
       },
     });
 
-    if (existingAccess) {
+    if (existingAccess)
       return res.status(400).json({ error: "Access already granted" });
-    }
 
     await prisma.access.create({
       data: {
         fromId: fromUser.id,
         toId: toUser.id,
-        fileId: fileId,
+        fileId,
       },
     });
 
     res.json({ message: `Access granted to ${toEmail} for file ${file.name}` });
   } catch (error) {
-    console.error(error);
+    console.error("Grant access error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
 
-// Get files shared with the authenticated user
-router.get("/shared", async (req, res) => {
-  const viewerEmail = req.user.email;
+// Get download logs for a specific file (owner only)
+router.get("/logs/:fileId", async (req, res) => {
+  const { fileId } = req.params;
+  const email = req.user.email;
 
   try {
-    const viewer = await prisma.user.findUnique({
-      where: { email: viewerEmail },
-    });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-    if (!viewer) {
-      return res.status(404).json({ error: "User not found" });
+    const file = await prisma.file.findUnique({ where: { id: fileId } });
+    if (!file) return res.status(404).json({ error: "File not found" });
+
+    if (file.ownerId !== user.id) {
+      return res
+        .status(403)
+        .json({ error: "You do not have access to this file's logs" });
     }
 
-    const accesses = await prisma.access.findMany({
-      where: { toId: viewer.id },
+    const logs = await prisma.log.findMany({
+      where: { fileId },
       include: {
-        from: {
-          include: {
-            files: true,
-          },
-        },
-        file: true,
+        user: true, // user who downloaded
+      },
+      orderBy: {
+        timestamp: "desc",
       },
     });
 
-    const sharedFiles = accesses.map((access) => ({
-      owner: access.from.name,
-      filename: access.file.name,
+    const formattedLogs = logs.map((log) => ({
+      downloadedBy: log.user.name,
+      downloadedAt: log.timestamp,
     }));
 
-    res.json({ sharedFiles });
+    res.json({ logs: formattedLogs });
   } catch (error) {
-    console.error(error);
+    console.error("Fetch logs error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Download a file (if owner or granted access), and log the download
+router.get("/download/:fileId", async (req, res) => {
+  const email = req.user.email;
+  const { fileId } = req.params;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const file = await prisma.file.findUnique({
+      where: { id: fileId },
+      include: { accesses: true },
+    });
+    if (!file) return res.status(404).json({ error: "File not found" });
+
+    const isOwner = file.ownerId === user.id;
+    const hasAccess = file.accesses.some((a) => a.toId === user.id);
+
+    if (!isOwner && !hasAccess)
+      return res.status(403).json({ error: "Access denied" });
+
+    // Log the download in Log model
+    await prisma.log.create({
+      data: {
+        fileId: file.id,
+        userId: user.id,
+        timestamp: new Date(),
+      },
+    });
+
+    res.json({ url: file.url });
+  } catch (error) {
+    console.error("Download error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -148,14 +184,40 @@ router.get("/myfiles", async (req, res) => {
       where: { email },
       include: { files: true },
     });
-
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
+    if (!user) return res.status(404).json({ error: "User not found" });
 
     res.json({ files: user.files });
   } catch (error) {
-    console.error(error);
+    console.error("My files error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Get files shared with the authenticated user
+router.get("/shared", async (req, res) => {
+  const email = req.user.email;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    const accesses = await prisma.access.findMany({
+      where: { toId: user.id },
+      include: {
+        from: true,
+        file: true,
+      },
+    });
+
+    const sharedFiles = accesses.map((a) => ({
+      id: a.file.id,
+      owner: a.from.name,
+      filename: a.file.name,
+    }));
+
+    res.json({ sharedFiles });
+  } catch (error) {
+    console.error("Shared files error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });

@@ -14,6 +14,7 @@ model User {
   files     File[]   @relation("UserFiles")
   given     Access[] @relation("AccessFrom")
   received  Access[] @relation("AccessTo")
+  logs      Log[]
 }
 
 model File {
@@ -23,6 +24,8 @@ model File {
   ownerId     String
   owner       User     @relation("UserFiles", fields: [ownerId], references: [id])
   accesses    Access[] // people who were granted access
+  logs        Log[]
+  publicId    String?
   createdAt   DateTime @default(now())
 }
 
@@ -39,4 +42,14 @@ model Access {
   grantedAt DateTime @default(now())
 
   @@unique([fromId, toId, fileId]) // prevent duplicate grants
+}
+
+model Log {
+  id        String   @id @default(uuid())
+  fileId    String
+  userId    String
+  timestamp DateTime @default(now())
+
+  file      File     @relation(fields: [fileId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
