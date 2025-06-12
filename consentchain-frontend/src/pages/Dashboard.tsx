@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getToken, removeToken } from "../utils/auth";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
+import "../styles/background.css";
 
 interface SharedFile {
   id: string;
@@ -181,98 +182,166 @@ function Dashboard() {
   };
 
   return (
-    <div style={{ padding: "20px" }}>
-      <h2>ConsentChain Dashboard</h2>
-
-      <div>
-        <h3>Upload File</h3>
-        <input
-          type="file"
-          onChange={(e) => {
-            if (e.target.files && e.target.files.length > 0) {
-              setFile(e.target.files[0]);
-            }
-          }}
-        />
-        <button onClick={handleUpload}>Upload</button>
+    <>
+      <div className="w-full flex justify-end px-10 pt-6 space-x-4 absolute top-0 right-0">
+        <span className="!font-mono text-[15px] text-gray-400 hover:text-white px-4 py-3 cursor-pointer transition">
+          SHARED FILES
+        </span>
+        <span className="!font-mono text-[15px] text-gray-400 hover:text-white px-4 py-3 cursor-pointer transition">
+          MY FILES
+        </span>
+        <span className="!font-mono text-[15px] text-gray-400 hover:text-white px-4 py-3 cursor-pointer transition">
+          LOGOUT
+        </span>
       </div>
 
-      <div style={{ marginTop: "20px" }}>
-        <h3>Grant Access</h3>
-        <select
-          value={selectedFileId}
-          onChange={(e) => setSelectedFileId(e.target.value)}
-          style={{ marginRight: "10px" }}
-        >
-          {myFiles.map((file) => (
-            <option key={file.id} value={file.id}>
-              {file.name}
-            </option>
-          ))}
-        </select>
-        <input
-          type="email"
-          placeholder="Email to share with"
-          value={toEmail}
-          onChange={(e) => setToEmail(e.target.value)}
-        />
-        <button onClick={handleGrantAccess}>Grant Access</button>
+      <div className="absolute top-8 left-8 flex items-center gap-2 z-50">
+        {/* Logo Icon */}
+        <div className="w-8 h-8 rounded-full bg-white text-black flex items-center justify-center font-bold text-sm shadow-md">
+          CC
+        </div>
+
+        {/* Logo Text */}
+        <span className="text-white tracking wide font-clash text-xl font-medium tracking-wide">
+          Consent<span className="text-white/60 px-0.5">Chain</span>
+        </span>
       </div>
 
-      <div style={{ marginTop: "20px" }}>
-        <h3>My Files</h3>
-        <ul>
-          {myFiles.length > 0 ? (
-            myFiles.map((file) => (
-              <li key={file.id}>
-                {file.name}
-                <button
-                  onClick={() => handleDownload(file.id)}
-                  style={{ marginLeft: 10 }}
-                >
-                  Download
-                </button>
-                <button
-                  onClick={() => navigate(`/logs/${file.id}`)}
-                  style={{ marginLeft: 10 }}
-                >
-                  View Logs
-                </button>
-              </li>
-            ))
-          ) : (
-            <li>No files uploaded yet.</li>
-          )}
-        </ul>
-      </div>
+      <div className="w-screen h-screen flex flex-col items-center justify-center bg-transparent">
+        <h1 className="text-3xl font-clash font-medium text-center mb-7 items-center justify-center">
+          Dashboard
+        </h1>
+        <div className="w-screen max-w-7xl bg-gradient-to-t from-[#171717] to-[#303030] border border-gray-500 rounded-2xl p-10 shadow-2xl min-h-[400px] flex flex-col justify-center items-center">
+          <div className="w-screen max-w-[1200px] bg-gradient-to-t from-[#000000] to-[#181818] border border-[#1b1b1b] rounded-2xl p-10 shadow-2xl min-h-[400px] flex flex-col justify-center">
+            <div className="flex items-center justify-between gap-4 py-4">
+              <label className="text-lg font-clash font-medium w-1/3">
+                Upload File
+              </label>
+              <input
+                type="file"
+                className="text-sm file:mr-4 file:px-4 file:py-1 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-gray-800 file:text-white hover:file:bg-gray-700"
+              ></input>
+              <button className="!bg-white !text-black px-5 py-2 rounded-full font-medium shadow-md border border-gray-300 hover:!bg-gray-200 transition">
+                Upload
+              </button>
+            </div>
 
-      <div style={{ marginTop: "20px" }}>
-        <h3>Shared With You</h3>
-        <ul>
-          {sharedFiles.length > 0 ? (
-            sharedFiles.map((file, index) => (
-              <li key={index}>
-                {file.filename} (shared by {file.owner}){" "}
-                <button
-                  onClick={() => {
-                    const token = getToken();
-                    window.open(
-                      `http://localhost:3000/files/download/${file.id}?token=${token}`,
-                      "_blank"
-                    );
-                  }}
-                >
-                  Download
-                </button>
-              </li>
-            ))
-          ) : (
-            <li>No files shared with you yet.</li>
-          )}
-        </ul>
+            <div className="flex items-center justify-between gap-4 py-11">
+              <label className="text-lg font-clash font-medium w-1/3">
+                Grant Access
+              </label>
+              <select className="bg-[#1b1b1b] text-white border border-gray-600 rounded-md px-4 py-2 text-sm w-1/4">
+                <option value="">Select File</option>
+                <option value="file1.pdf">file1.pdf</option>
+              </select>
+
+              <input
+                type="email"
+                placeholder="Email to share with"
+                className="bg-[#1b1b1b] border border-gray-600 rounded-md px-4 py-2 text-sm text-white w-1/3 placeholder-gray-400"
+              />
+
+              <button className="!bg-white !text-black px-20 py-2 rounded-full font-medium shadow-md border border-gray-300 hover:!bg-gray-200 transition">
+                Grant
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
 export default Dashboard;
+
+// <div style={{ padding: "20px" }}>
+//   <h2>ConsentChain Dashboard</h2>
+
+//   <div>
+//     <h3>Upload File</h3>
+//     <input
+//       type="file"
+//       onChange={(e) => {
+//         if (e.target.files && e.target.files.length > 0) {
+//           setFile(e.target.files[0]);
+//         }
+//       }}
+//     />
+//     <button onClick={handleUpload}>Upload</button>
+//   </div>
+
+//   <div style={{ marginTop: "20px" }}>
+//     <h3>Grant Access</h3>
+//     <select
+//       value={selectedFileId}
+//       onChange={(e) => setSelectedFileId(e.target.value)}
+//       style={{ marginRight: "10px" }}
+//     >
+//       {myFiles.map((file) => (
+//         <option key={file.id} value={file.id}>
+//           {file.name}
+//         </option>
+//       ))}
+//     </select>
+//     <input
+//       type="email"
+//       placeholder="Email to share with"
+//       value={toEmail}
+//       onChange={(e) => setToEmail(e.target.value)}
+//     />
+//     <button onClick={handleGrantAccess}>Grant Access</button>
+//   </div>
+
+//   <div style={{ marginTop: "20px" }}>
+//     <h3>My Files</h3>
+//     <ul>
+//       {myFiles.length > 0 ? (
+//         myFiles.map((file) => (
+//           <li key={file.id}>
+//             {file.name}
+//             <button
+//               onClick={() => handleDownload(file.id)}
+//               style={{ marginLeft: 10 }}
+//             >
+//               Download
+//             </button>
+//             <button
+//               onClick={() => navigate(`/logs/${file.id}`)}
+//               style={{ marginLeft: 10 }}
+//             >
+//               View Logs
+//             </button>
+//           </li>
+//         ))
+//       ) : (
+//         <li>No files uploaded yet.</li>
+//       )}
+//     </ul>
+//   </div>
+
+//   <div style={{ marginTop: "20px" }}>
+//     <h3>Shared With You</h3>
+//     <ul>
+//       {sharedFiles.length > 0 ? (
+//         sharedFiles.map((file, index) => (
+//           <li key={index}>
+//             {file.filename} (shared by {file.owner}){" "}
+//             <button
+//               onClick={() => {
+//                 const token = getToken();
+//                 window.open(
+//                   `http://localhost:3000/files/download/${file.id}?token=${token}`,
+//                   "_blank"
+//                 );
+//               }}
+//             >
+//               Download
+//             </button>
+//           </li>
+//         ))
+//       ) : (
+//         <li>No files shared with you yet.</li>
+//       )}
+//     </ul>
+//   </div>
+// </div>
