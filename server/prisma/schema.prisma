@@ -8,25 +8,27 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id        String     @id @default(uuid())
+  email     String     @unique
   name      String
-  files     File[]   @relation("UserFiles")
-  given     Access[] @relation("AccessFrom")
-  received  Access[] @relation("AccessTo")
+  files     File[]     @relation("UserFiles")
+  given     Access[]   @relation("AccessFrom")
+  received  Access[]   @relation("AccessTo")
   logs      Log[]
+  auditLogs AuditLog[] // ✅ reverse relation to AuditLog
 }
 
 model File {
-  id          String   @id @default(uuid())
+  id          String     @id @default(uuid())
   name        String
   url         String
   ownerId     String
-  owner       User     @relation("UserFiles", fields: [ownerId], references: [id])
-  accesses    Access[] // people who were granted access
+  owner       User       @relation("UserFiles", fields: [ownerId], references: [id])
+  accesses    Access[]   // people who were granted access
   logs        Log[]
+  auditLogs   AuditLog[] // ✅ reverse relation to AuditLog
   publicId    String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime   @default(now())
 }
 
 model Access {
@@ -53,3 +55,16 @@ model Log {
   file      File     @relation(fields: [fileId], references: [id])
   user      User     @relation(fields: [userId], references: [id])
 }
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  fileId    String
+  action    String
+  toUser    String?  // 👈 Add this
+  timestamp DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+  file      File     @relation(fields: [fileId], references: [id])
+}
+

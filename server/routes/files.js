@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 const verifyJWT = require("../utils/auth");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
+const { logAudit } = require("../utils/audit");
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -91,9 +92,70 @@ router.post("/grant", async (req, res) => {
       },
     });
 
+    // ✅ Use helper to log audit
+    await logAudit(fromUser.id, fileId, "granted", toUser.id);
+
     res.json({ message: `Access granted to ${toEmail} for file ${file.name}` });
   } catch (error) {
     console.error("Grant access error:", error);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// Revoke access to a file
+router.post("/revoke", async (req, res) => {
+  const { toEmail, fileId } = req.body;
+  const fromEmail = req.user.email;
+
+  if (!fileId || !toEmail) {
+    return res.status(400).json({ error: "Missing toEmail or fileId" });
+  }
+
+  try {
+    console.log("Revoke Request →", { fromEmail, toEmail, fileId });
+
+    const [fromUser, toUser] = await Promise.all([
+      prisma.user.findUnique({ where: { email: fromEmail } }),
+      prisma.user.findUnique({ where: { email: toEmail } }),
+    ]);
+
+    if (!fromUser || !toUser) {
+      return res.status(404).json({ error: "User(s) not found" });
+    }
+
+    const file = await prisma.file.findUnique({ where: { id: fileId } });
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    if (file.ownerId !== fromUser.id) {
+      return res.status(403).json({ error: "You do not own this file" });
+    }
+
+    const accessRecord = await prisma.access.findFirst({
+      where: {
+        fileId: fileId,
+        fromId: fromUser.id,
+        toId: toUser.id,
+      },
+    });
+
+    if (!accessRecord) {
+      return res.status(400).json({ error: "Access not found to revoke" });
+    }
+
+    await prisma.access.delete({
+      where: {
+        id: accessRecord.id, // ✅ delete by known unique ID
+      },
+    });
+
+    // Log it
+    await logAudit(fromUser.id, fileId, "revoked", toUser.id);
+
+    res.json({ message: `Access revoked from ${toEmail}` });
+  } catch (error) {
+    console.error("Revoke access error:", error);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -110,28 +172,55 @@ router.get("/logs/:fileId", async (req, res) => {
     const file = await prisma.file.findUnique({ where: { id: fileId } });
     if (!file) return res.status(404).json({ error: "File not found" });
 
-    if (file.ownerId !== user.id) {
+    if (file.ownerId !== user.id)
       return res
         .status(403)
         .json({ error: "You do not have access to this file's logs" });
-    }
 
-    const logs = await prisma.log.findMany({
+    // Download logs
+    const downloadLogs = await prisma.log.findMany({
       where: { fileId },
-      include: {
-        user: true, // user who downloaded
-      },
-      orderBy: {
-        timestamp: "desc",
-      },
+      include: { user: true },
+      orderBy: { timestamp: "desc" },
     });
 
-    const formattedLogs = logs.map((log) => ({
-      downloadedBy: log.user.name,
-      downloadedAt: log.timestamp,
+    // Audit logs
+    const auditLogs = await prisma.auditLog.findMany({
+      where: { fileId },
+      include: { user: true },
+      orderBy: { timestamp: "desc" },
+    });
+
+    // Preload all recipient users whose IDs are in `toUser`
+    const toUserIds = [
+      ...new Set(auditLogs.map((log) => log.toUser).filter(Boolean)),
+    ];
+
+    console.log(
+      auditLogs.map((log) => ({ action: log.action, toUser: log.toUser }))
+    );
+
+    const toUsers = await prisma.user.findMany({
+      where: { id: { in: toUserIds } },
+    });
+    const toUserMap = Object.fromEntries(
+      toUsers.map((user) => [user.id, user.email])
+    );
+
+    const formattedDownloads = downloadLogs.map((log) => ({
+      type: "download",
+      by: log.user.name,
+      at: log.timestamp,
     }));
 
-    res.json({ logs: formattedLogs });
+    const formattedAudits = auditLogs.map((log) => ({
+      type: log.action, // granted/revoked
+      by: log.user.name,
+      to: log.toUser ? toUserMap[log.toUser] ?? "Unknown" : null,
+      at: log.timestamp,
+    }));
+
+    res.json({ logs: [...formattedDownloads, ...formattedAudits] });
   } catch (error) {
     console.error("Fetch logs error:", error);
     res.status(500).json({ error: "Server error" });
