@@ -20,7 +20,7 @@ function Login() {
           <div className="w-full min-w-[1050px] bg-gradient-to-t from-[#000000] to-[#181818] border border-[#1b1b1b] rounded-3xl p-5 shadow-2xl flex flex-col justify-center items-center gap-14 min-h-[400px] text-center">
             {/* Title & Subtitle */}
             <div className="space-y-2">
-              <h1 className="text-[70px] !text-[62px] font-clash tracking-wide !font-semibold leading-[1.1] text-white py-[20px]">
+              <h1 className="text-[70px] !text-[62px] font-clash tracking-wide !font-semibold leading-tight text-white py-[20px]">
                 Your data.
                 <span className="text-gray-300">Your rules.</span>
               </h1>
@@ -35,7 +35,12 @@ function Login() {
             </div>
 
             {/* Google Sign In Button */}
-            <button className="flex items-center gap-3 !bg-white text-black font-medium px-6 py-3 rounded-full shadow hover:bg-gray-200 transition">
+            <button
+              onClick={() =>
+                (window.location.href = "http://localhost:3000/auth/google")
+              }
+              className="flex items-center gap-3 !bg-white text-black font-medium px-6 py-3 rounded-full shadow hover:bg-gray-200 transition"
+            >
               <img
                 src="https://www.svgrepo.com/show/475656/google-color.svg"
                 alt="Google"

@@ -42,25 +42,34 @@ const FileLogs = () => {
   if (error) return <p className="text-red-500 text-center">{error}</p>;
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <h1 className="text-xl font-bold mb-4">Download Logs</h1>
-      {logs.length === 0 ? (
-        <p>No download activity yet.</p>
-      ) : (
-        <ul className="space-y-2">
-          {logs.map((log, index) => (
-            <li key={index} className="bg-white p-3 rounded shadow">
-              <div>
-                <strong>User:</strong> {log.downloadedBy}
-              </div>
-              <div>
-                <strong>Time:</strong>{" "}
-                {new Date(log.downloadedAt).toLocaleString()}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+    <div className="w-screen h-screen flex flex-col items-center justify-start pt-20 bg-transparent">
+      {/* Centered Glassy Container */}
+      <div className="w-full max-w-4xl bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl px-10 py-12">
+        <h1 className="text-3xl font-clash font-medium mb-8 tracking-wide text-center">
+          Download Logs
+        </h1>
+        {logs.length === 0 ? (
+          <p className="text-gray-400 text-center">No download activity yet.</p>
+        ) : (
+          <ul className="space-y-4">
+            {logs.map((log, index) => (
+              <li
+                key={index}
+                className="p-5 rounded-2xl border border-gray-700 bg-gradient-to-br from-[#101010] to-[#1a1a1a] shadow-md"
+              >
+                <div className="font-mono text-sm">
+                  <span className="text-gray-400 mr-1">User:</span>
+                  {log.downloadedBy}
+                </div>
+                <div className="font-mono text-sm mt-1">
+                  <span className="text-gray-400 mr-1">Time:</span>
+                  {new Date(log.downloadedAt).toLocaleString()}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 };

@@ -12,21 +12,13 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route
-          path="/"
-          element={
-            <div>
-              <a href="/auth/google">Login with Google</a>
-            </div>
-          }
-        />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/auth" element={<OAuthHandler />} />
         <Route path="/logs" element={<Logs />} />
         <Route path="/logs/:fileId" element={<FileLogs />} />
         <Route path="/sharedfiles" element={<SharedFiles />} />
         <Route path="/myfiles" element={<MyFiles />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Login />} />
       </Routes>
     </Router>
   );
