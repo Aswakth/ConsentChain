@@ -4,7 +4,7 @@ import { getToken } from "../utils/auth";
 import { useParams } from "react-router-dom";
 
 type LogEntry = {
-  type: string; // "download", "granted", "revoked"
+  type: string; // "download", "granted", "revoked", "expired"
   by: string;
   to?: string;
   at: string;
@@ -16,6 +16,7 @@ const FileLogs = () => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [revokedUsers, setRevokedUsers] = useState<Set<string>>(new Set());
+  const [expiredUsers, setExpiredUsers] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchLogs();
@@ -31,6 +32,16 @@ const FileLogs = () => {
         }
       );
       setLogs(response.data.logs);
+
+      // update revoked and expired sets
+      const revoked = new Set<string>();
+      const expired = new Set<string>();
+      for (const log of response.data.logs) {
+        if (log.type === "revoked" && log.to) revoked.add(log.to);
+        if (log.type === "expired" && log.to) expired.add(log.to);
+      }
+      setRevokedUsers(revoked);
+      setExpiredUsers(expired);
     } catch (err) {
       setError("Failed to fetch logs or access denied");
       console.error(err);
@@ -48,7 +59,6 @@ const FileLogs = () => {
         { toEmail, fileId },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setRevokedUsers((prev) => new Set(prev).add(toEmail));
       await fetchLogs(); // refresh logs after revoke
     } catch (err) {
       console.error("Failed to revoke access:", err);
@@ -83,13 +93,16 @@ const FileLogs = () => {
                       ? `Access Granted to ${log.to}`
                       : log.type === "revoked"
                       ? `Access Revoked from ${log.to}`
+                      : log.type === "expired"
+                      ? `Access Expired for ${log.to}`
                       : log.type}
                   </span>
 
-                  {/* ✅ Show Revoke button only on granted logs */}
+                  {/* ✅ Show revoke only if not revoked or expired */}
                   {log.type === "granted" &&
                     log.to &&
-                    !revokedUsers.has(log.to) && (
+                    !revokedUsers.has(log.to) &&
+                    !expiredUsers.has(log.to) && (
                       <button
                         onClick={() => handleRevoke(log.to)}
                         className="ml-4 text-xs px-3 py-1 !bg-red-700 hover:bg-red-700 rounded-full text-white font-mono"

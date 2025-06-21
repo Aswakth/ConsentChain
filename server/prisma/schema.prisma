@@ -32,19 +32,19 @@ model File {
 }
 
 model Access {
-  id        String   @id @default(uuid())
-  fromId    String
-  toId      String
-  fileId    String
-
-  from      User     @relation("AccessFrom", fields: [fromId], references: [id])
-  to        User     @relation("AccessTo", fields: [toId], references: [id])
-  file      File     @relation(fields: [fileId], references: [id])
-
-  grantedAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  fromId     String
+  toId       String
+  fileId     String
+  from       User     @relation("AccessFrom", fields: [fromId], references: [id])
+  to         User     @relation("AccessTo", fields: [toId], references: [id])
+  file       File     @relation(fields: [fileId], references: [id])
+  grantedAt  DateTime @default(now())
+  expiryTime DateTime? // 🆕 Optional expiry timestamp
 
   @@unique([fromId, toId, fileId]) // prevent duplicate grants
 }
+
 
 model Log {
   id        String   @id @default(uuid())

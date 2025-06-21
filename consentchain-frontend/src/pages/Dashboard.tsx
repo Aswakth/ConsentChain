@@ -21,6 +21,9 @@ function Dashboard() {
   const [file, setFile] = useState<File | null>(null);
   const [toEmail, setToEmail] = useState("");
   const [selectedFileId, setSelectedFileId] = useState<string>("");
+  const [expiryOption, setExpiryOption] = useState("");
+  const [customExpiry, setCustomExpiry] = useState("");
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -118,19 +121,36 @@ function Dashboard() {
       navigate("/");
       return;
     }
+
     if (!toEmail.trim()) {
       alert("Please enter an email address.");
       return;
     }
+
     if (!selectedFileId) {
       alert("Please select a file to share.");
       return;
     }
 
+    // 🌟 Compute expiryTime
+    let expiryTime: string | null = null;
+
+    if (expiryOption === "24h") {
+      expiryTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    } else if (expiryOption === "7d") {
+      expiryTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (expiryOption === "custom") {
+      if (!customExpiry) {
+        alert("Please select a custom expiry date.");
+        return;
+      }
+      expiryTime = new Date(customExpiry).toISOString();
+    }
+
     axios
       .post(
         "http://localhost:3000/files/grant",
-        { fileId: selectedFileId, toEmail },
+        { fileId: selectedFileId, toEmail, expiryTime },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -140,6 +160,8 @@ function Dashboard() {
       .then(() => {
         alert("Access granted!");
         setToEmail("");
+        setExpiryOption("");
+        setCustomExpiry("");
       })
       .catch((err) => {
         if (err.response?.status === 401) {
@@ -248,9 +270,11 @@ function Dashboard() {
 
               {/* Grant Access Section */}
               <div className="flex items-center justify-between gap-4 py-11">
-                <label className="text-lg font-clash font-medium w-1/3">
+                <label className="text-lg font-clash font-medium w-1/6">
                   Grant Access
                 </label>
+
+                {/* File selection */}
                 <select
                   value={selectedFileId}
                   onChange={(e) => setSelectedFileId(e.target.value)}
@@ -263,16 +287,42 @@ function Dashboard() {
                     </option>
                   ))}
                 </select>
+
+                {/* Email input */}
                 <input
                   type="email"
                   placeholder="Email to share with"
                   value={toEmail}
                   onChange={(e) => setToEmail(e.target.value)}
-                  className="bg-[#1b1b1b] border border-gray-600 rounded-md px-4 py-2 text-sm text-white w-1/3 placeholder-gray-400"
+                  className="bg-[#1b1b1b] border border-gray-600 rounded-md px-4 py-2 text-sm text-white w-1/4 placeholder-gray-400"
                 />
+
+                {/* Expiry selector */}
+                <select
+                  value={expiryOption}
+                  onChange={(e) => setExpiryOption(e.target.value)}
+                  className="bg-[#1b1b1b] text-white border border-gray-600 rounded-md px-4 py-2 text-sm w-1/6"
+                >
+                  <option value="">No Expiry</option>
+                  <option value="24h">24 hours</option>
+                  <option value="7d">7 days</option>
+                  <option value="custom">Custom</option>
+                </select>
+
+                {/* Custom expiry datetime input */}
+                {expiryOption === "custom" && (
+                  <input
+                    type="datetime-local"
+                    value={customExpiry}
+                    onChange={(e) => setCustomExpiry(e.target.value)}
+                    className="bg-[#1b1b1b] border border-gray-600 rounded-md px-3 py-2 text-sm text-white w-1/4"
+                  />
+                )}
+
+                {/* Grant button */}
                 <button
                   onClick={handleGrantAccess}
-                  className="!bg-white !text-black px-20 py-2 rounded-full font-medium shadow-md border border-gray-300 hover:!bg-gray-200 transition"
+                  className="!bg-white !text-black px-10 py-2 rounded-full font-medium shadow-md border border-gray-300 hover:!bg-gray-200 transition"
                 >
                   Grant
                 </button>

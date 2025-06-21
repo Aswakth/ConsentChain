@@ -52,7 +52,7 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
 // Grant access to a file to another user
 router.post("/grant", async (req, res) => {
-  const { toEmail, fileId } = req.body;
+  const { toEmail, fileId, expiryTime } = req.body; // 🆕 expiryTime from frontend
   const fromEmail = req.user.email;
 
   if (!fileId || !toEmail)
@@ -89,6 +89,7 @@ router.post("/grant", async (req, res) => {
         fromId: fromUser.id,
         toId: toUser.id,
         fileId,
+        expiryTime: expiryTime ? new Date(expiryTime) : null, // 🆕 Optional expiry
       },
     });
 
@@ -243,12 +244,32 @@ router.get("/download/:fileId", async (req, res) => {
     if (!file) return res.status(404).json({ error: "File not found" });
 
     const isOwner = file.ownerId === user.id;
-    const hasAccess = file.accesses.some((a) => a.toId === user.id);
 
-    if (!isOwner && !hasAccess)
+    // Check if user has access entry
+    const access = file.accesses.find((a) => a.toId === user.id);
+
+    // ❌ No access and not owner
+    if (!isOwner && !access) {
       return res.status(403).json({ error: "Access denied" });
+    }
 
-    // Log the download in Log model
+    // 🕒 Check if access has expired
+    if (access?.expiryTime && new Date() > new Date(access.expiryTime)) {
+      // ✅ Log "access expired" in audit logs
+      await prisma.auditLog.create({
+        data: {
+          userId: access.fromId,
+          fileId: file.id,
+          action: "expired",
+          toUser: user.id,
+          timestamp: new Date(),
+        },
+      });
+
+      return res.status(403).json({ error: "Access expired" });
+    }
+
+    // ✅ Log the download
     await prisma.log.create({
       data: {
         fileId: file.id,
