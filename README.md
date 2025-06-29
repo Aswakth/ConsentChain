@@ -6,7 +6,6 @@ ConsentChain is a smart, consent-based cloud file access manager that acts as a 
 
 Unlike standard cloud storage services such as Google Drive, which rely on static permissions and lack access visibility, ConsentChain introduces dynamic, fine-grained control over file access. It empowers data owners with:
 
-- Explicit consent approval or denial for each access request
 - Automatic expiry of shared access based on configured time limits
 - Real-time access analytics and file usage insights
 - A complete audit and download logs of files
