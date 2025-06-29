@@ -53,11 +53,10 @@ function MyFiles() {
         <span
           className="!font-mono text-[15px] text-gray-400 hover:text-white px-4 py-3 cursor-pointer transition"
           onClick={() => {
-            removeToken();
-            navigate("/");
+            navigate("/analytics");
           }}
         >
-          LOGOUT
+          ANALYTICS
         </span>
       </div>
 

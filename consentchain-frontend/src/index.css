@@ -107,7 +107,6 @@ button:focus-visible {
   }
 }
 
-/* index.css or App.css */
 ::-webkit-scrollbar {
   width: 8px;
 }
@@ -115,7 +114,7 @@ button:focus-visible {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background-color: #555; /* or use Tailwind gray shades */
+  background-color: #555;
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: content-box;

@@ -15,7 +15,7 @@ model User {
   given     Access[]   @relation("AccessFrom")
   received  Access[]   @relation("AccessTo")
   logs      Log[]
-  auditLogs AuditLog[] // ✅ reverse relation to AuditLog
+  auditLogs AuditLog[] 
 }
 
 model File {
@@ -26,7 +26,7 @@ model File {
   owner       User       @relation("UserFiles", fields: [ownerId], references: [id])
   accesses    Access[]   // people who were granted access
   logs        Log[]
-  auditLogs   AuditLog[] // ✅ reverse relation to AuditLog
+  auditLogs   AuditLog[] 
   publicId    String?
   createdAt   DateTime   @default(now())
 }
@@ -40,7 +40,7 @@ model Access {
   to         User     @relation("AccessTo", fields: [toId], references: [id])
   file       File     @relation(fields: [fileId], references: [id])
   grantedAt  DateTime @default(now())
-  expiryTime DateTime? // 🆕 Optional expiry timestamp
+  expiryTime DateTime? 
 
   @@unique([fromId, toId, fileId]) // prevent duplicate grants
 }
@@ -61,7 +61,7 @@ model AuditLog {
   userId    String
   fileId    String
   action    String
-  toUser    String?  // 👈 Add this
+  toUser    String?  
   timestamp DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id])

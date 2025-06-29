@@ -13,12 +13,10 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Apply JWT verification middleware to all routes in this router
 router.use(verifyJWT);
 
 const upload = multer({ dest: "uploads/" });
 
-// Upload a file for authenticated user
 router.post("/upload", upload.single("file"), async (req, res) => {
   const email = req.user.email;
   const file = req.file;
@@ -50,9 +48,8 @@ router.post("/upload", upload.single("file"), async (req, res) => {
   }
 });
 
-// Grant access to a file to another user
 router.post("/grant", async (req, res) => {
-  const { toEmail, fileId, expiryTime } = req.body; // 🆕 expiryTime from frontend
+  const { toEmail, fileId, expiryTime } = req.body;
   const fromEmail = req.user.email;
 
   if (!fileId || !toEmail)
@@ -89,11 +86,10 @@ router.post("/grant", async (req, res) => {
         fromId: fromUser.id,
         toId: toUser.id,
         fileId,
-        expiryTime: expiryTime ? new Date(expiryTime) : null, // 🆕 Optional expiry
+        expiryTime: expiryTime ? new Date(expiryTime) : null,
       },
     });
 
-    // ✅ Use helper to log audit
     await logAudit(fromUser.id, fileId, "granted", toUser.id);
 
     res.json({ message: `Access granted to ${toEmail} for file ${file.name}` });
@@ -103,7 +99,6 @@ router.post("/grant", async (req, res) => {
   }
 });
 
-// Revoke access to a file
 router.post("/revoke", async (req, res) => {
   const { toEmail, fileId } = req.body;
   const fromEmail = req.user.email;
@@ -147,11 +142,10 @@ router.post("/revoke", async (req, res) => {
 
     await prisma.access.delete({
       where: {
-        id: accessRecord.id, // ✅ delete by known unique ID
+        id: accessRecord.id,
       },
     });
 
-    // Log it
     await logAudit(fromUser.id, fileId, "revoked", toUser.id);
 
     res.json({ message: `Access revoked from ${toEmail}` });
@@ -161,7 +155,6 @@ router.post("/revoke", async (req, res) => {
   }
 });
 
-// Get download logs for a specific file (owner only)
 router.get("/logs/:fileId", async (req, res) => {
   const { fileId } = req.params;
   const email = req.user.email;
@@ -192,7 +185,6 @@ router.get("/logs/:fileId", async (req, res) => {
       orderBy: { timestamp: "desc" },
     });
 
-    // Preload all recipient users whose IDs are in `toUser`
     const toUserIds = [
       ...new Set(auditLogs.map((log) => log.toUser).filter(Boolean)),
     ];
@@ -228,7 +220,6 @@ router.get("/logs/:fileId", async (req, res) => {
   }
 });
 
-// Download a file (if owner or granted access), and log the download
 router.get("/download/:fileId", async (req, res) => {
   const email = req.user.email;
   const { fileId } = req.params;
@@ -245,17 +236,13 @@ router.get("/download/:fileId", async (req, res) => {
 
     const isOwner = file.ownerId === user.id;
 
-    // Check if user has access entry
     const access = file.accesses.find((a) => a.toId === user.id);
 
-    // ❌ No access and not owner
     if (!isOwner && !access) {
       return res.status(403).json({ error: "Access denied" });
     }
 
-    // 🕒 Check if access has expired
     if (access?.expiryTime && new Date() > new Date(access.expiryTime)) {
-      // ✅ Log "access expired" in audit logs
       await prisma.auditLog.create({
         data: {
           userId: access.fromId,
@@ -269,7 +256,6 @@ router.get("/download/:fileId", async (req, res) => {
       return res.status(403).json({ error: "Access expired" });
     }
 
-    // ✅ Log the download
     await prisma.log.create({
       data: {
         fileId: file.id,
@@ -329,6 +315,61 @@ router.get("/shared", async (req, res) => {
   } catch (error) {
     console.error("Shared files error:", error);
     res.status(500).json({ error: "Server error" });
+  }
+});
+
+// GET /analytics/summary
+router.get("/analytics/summary", async (req, res) => {
+  const email = req.user.email;
+
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    // Get all files owned by the user
+    const files = await prisma.file.findMany({
+      where: { ownerId: user.id },
+      select: { id: true, name: true },
+    });
+
+    const fileIds = files.map((f) => f.id);
+
+    // Get logs for all files owned by user
+    const logs = await prisma.log.findMany({
+      where: { fileId: { in: fileIds } },
+      select: { fileId: true, timestamp: true },
+    });
+
+    // Process analytics
+    const fileDownloads = {};
+    const dailyDownloads = {};
+
+    for (const log of logs) {
+      fileDownloads[log.fileId] = (fileDownloads[log.fileId] || 0) + 1;
+
+      const date = log.timestamp.toISOString().slice(0, 10);
+      dailyDownloads[date] = (dailyDownloads[date] || 0) + 1;
+    }
+
+    const mostAccessed = files.map((file) => ({
+      fileName: file.name,
+      downloadCount: fileDownloads[file.id] || 0,
+    }));
+
+    mostAccessed.sort((a, b) => b.downloadCount - a.downloadCount);
+
+    const accessPattern = Object.entries(dailyDownloads)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    res.json({
+      totalDownloads: logs.length,
+      mostAccessed,
+      accessPattern,
+    });
+  } catch (err) {
+    console.error("Analytics error:", err);
+    res.status(500).json({ error: "Failed to get analytics" });
   }
 });
 

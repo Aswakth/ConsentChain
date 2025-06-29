@@ -7,6 +7,7 @@ import SharedFiles from "./pages/SharedFiles";
 import MyFiles from "./pages/MyFiles";
 import Login from "./pages/Login";
 import "./styles/background.css";
+import Analytics from "./pages/Analytics";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Route path="/sharedfiles" element={<SharedFiles />} />
         <Route path="/myfiles" element={<MyFiles />} />
         <Route path="/" element={<Login />} />
+        <Route path="/analytics" element={<Analytics />} />
       </Routes>
     </Router>
   );

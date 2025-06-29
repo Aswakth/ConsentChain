@@ -98,7 +98,6 @@ const FileLogs = () => {
                       : log.type}
                   </span>
 
-                  {/* ✅ Show revoke only if not revoked or expired */}
                   {log.type === "granted" &&
                     log.to &&
                     !revokedUsers.has(log.to) &&
